@@ -90,9 +90,8 @@ export default function LeaderboardPage() {
     };
   }, []);
 
-  const overall = useMemo(() => rows.slice(0, 5), [rows]);
-  const men = useMemo(() => rows.filter((r) => r.gender === 'male').slice(0, 5), [rows]);
-  const women = useMemo(() => rows.filter((r) => r.gender === 'female').slice(0, 5), [rows]);
+  const men = useMemo(() => rows.filter((r) => r.gender === 'male'), [rows]);
+  const women = useMemo(() => rows.filter((r) => r.gender === 'female'), [rows]);
 
   return (
     <main className="min-h-screen bg-ink px-6 py-10 md:px-12">
@@ -115,10 +114,10 @@ export default function LeaderboardPage() {
         <p className="text-muted">กำลังโหลดข้อมูล...</p>
       ) : (
         <div className="flex flex-col gap-10">
-          <Board title="อันดับรวม TOP 5" rows={overall} />
+          <Board title="อันดับรวม" rows={rows} />
           <div className="flex flex-col gap-10 md:flex-row">
-            <Board title="ชาย TOP 5" rows={men} />
-            <Board title="หญิง TOP 5" rows={women} />
+            <Board title="ชาย" rows={men} />
+            <Board title="หญิง" rows={women} />
           </div>
         </div>
       )}
