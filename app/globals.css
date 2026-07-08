@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: 'Anton', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: #0a0c10;
+  color: #f5f6f8;
+  font-family: var(--font-body);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* signature: photo-finish speed streak behind the #1 row */
+.speed-streak {
+  position: relative;
+  overflow: hidden;
+}
+.speed-streak::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 77, 46, 0.35), transparent);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid #ff4d2e;
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  background: #1b1f27;
+  border: 1px solid #262b34;
+  color: #f5f6f8;
+}
+
+input::placeholder {
+  color: #8a8f9b;
+}
