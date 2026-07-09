@@ -246,7 +246,7 @@ function RankCard({ row, rank, maxDist }: { row: LeaderboardRow; rank: number; m
 /* ============================================================
    RANKING LIST (with gender filter tabs)
 ============================================================ */
-function RankingSection({ title, rows }: { title: string; rows: LeaderboardRow[] }) {
+function RankingSection({ title, rows, isScrollable }: { title: string; rows: LeaderboardRow[]; isScrollable?: boolean }) {
   const maxDist = useMemo(
     () => (rows.length > 0 ? Math.max(...rows.map((r) => r.distance_m)) : 0),
     [rows]
@@ -254,7 +254,7 @@ function RankingSection({ title, rows }: { title: string; rows: LeaderboardRow[]
 
   if (rows.length === 0) {
     return (
-      <div>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <h3 className="section-title">{title}</h3>
         <div className="empty-state">
           <div className="empty-icon">🏟️</div>
@@ -265,12 +265,12 @@ function RankingSection({ title, rows }: { title: string; rows: LeaderboardRow[]
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <h3 className="section-title">
         {title}
         <span className="badge">{rows.length} คน</span>
       </h3>
-      <div className="ranking-list">
+      <div className={isScrollable ? 'ranking-scroll-area' : 'ranking-list'}>
         {rows.map((row, i) => (
           <RankCard key={row.id} row={row} rank={i + 1} maxDist={maxDist} />
         ))}
@@ -378,8 +378,25 @@ export default function LeaderboardPage() {
             </div>
           </div>
 
-          {/* Stats in header — right side */}
+          {/* Stats in header & Tabs */}
           <div className="header-stats">
+            {/* Navigation tabs as Pill buttons */}
+            <nav className="nav-tabs" role="tablist">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
+                  role="tab"
+                  aria-selected={activeTab === tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="header-stat-divider hide-mobile" />
+
             <HeaderStat
               icon="👟"
               label="ผู้เข้าร่วม"
@@ -396,23 +413,6 @@ export default function LeaderboardPage() {
             />
           </div>
         </div>
-
-        {/* Navigation tabs */}
-        <div className="header-inner" style={{ paddingTop: 0 }}>
-          <nav className="nav-tabs" role="tablist">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-                role="tab"
-                aria-selected={activeTab === tab.key}
-                onClick={() => setActiveTab(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
       </header>
 
       {/* Main content */}
@@ -423,22 +423,40 @@ export default function LeaderboardPage() {
         ) : (
           <div className="tab-panel active">
             {activeTab === 'leaderboard' && (
-              <>
-                {/* Top 5 Male & Female side-by-side */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 28, marginBottom: 40 }}>
+              <div className="lb-container">
+                {/* Left side: Top 5 Male & Female */}
+                <div className="lb-top5">
                   <RankingSection title="🏆 ชาย TOP 5" rows={men.slice(0, 5)} />
+                  <div style={{ height: 24, flexShrink: 0 }} />
                   <RankingSection title="🏆 หญิง TOP 5" rows={women.slice(0, 5)} />
                 </div>
-                <RankingSection title="🏅 อันดับรวมทั้งหมด" rows={activeRows} />
-              </>
+                {/* Right side: All Ranks Scrollable */}
+                <div className="lb-all">
+                  <RankingSection title="🏅 อันดับรวมทั้งหมด" rows={activeRows} isScrollable={true} />
+                </div>
+              </div>
             )}
 
             {activeTab === 'male' && (
-              <RankingSection title="👨 อันดับชาย" rows={activeRows} />
+              <div className="lb-container">
+                <div className="lb-top5">
+                  <RankingSection title="🏆 ชาย TOP 5" rows={men.slice(0, 5)} />
+                </div>
+                <div className="lb-all">
+                  <RankingSection title="👨 อันดับชายทั้งหมด" rows={activeRows} isScrollable={true} />
+                </div>
+              </div>
             )}
 
             {activeTab === 'female' && (
-              <RankingSection title="👩 อันดับหญิง" rows={activeRows} />
+              <div className="lb-container">
+                <div className="lb-top5">
+                  <RankingSection title="🏆 หญิง TOP 5" rows={women.slice(0, 5)} />
+                </div>
+                <div className="lb-all">
+                  <RankingSection title="👩 อันดับหญิงทั้งหมด" rows={activeRows} isScrollable={true} />
+                </div>
+              </div>
             )}
           </div>
         )}
