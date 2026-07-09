@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Curved Treadmill Sprint | ตารางอันดับ',
-  description: 'วิ่ง 30 วินาที ใครไปได้ไกลสุด',
+  title: 'ท้าทายขีดจำกัดความเร็ว | Speed Challenge',
+  description: '⚡ Speed Challenge · 30-Second Sprint · Track & Field — วิ่ง 30 วินาที ใครไปได้ไกลสุด',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
