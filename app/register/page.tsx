@@ -1,19 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 
+// Resize an image client-side to keep uploads small (~max 500px)
+async function resizeImage(file: File, maxSize = 500): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+  if (scale === 1) return file;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve) =>
+    canvas.toBlob((b) => resolve(b ?? file), 'image/jpeg', 0.85)
+  );
+}
+
 const initialForm = {
+  full_name: '',
   student_id: '',
-  first_name: '',
-  last_name: '',
-  year_level: '',
-  faculty: '',
   department: '',
-  phone: '',
+  faculty: '',
+  year_level: '',
   gender: '' as '' | 'male' | 'female',
+  phone: '',
 };
+
+const yearOptions = [
+  { value: '1', label: 'ปี 1' },
+  { value: '2', label: 'ปี 2' },
+  { value: '3', label: 'ปี 3' },
+  { value: '4', label: 'ปี 4' },
+  { value: '5', label: 'อื่นๆ' },
+];
 
 export default function RegisterPage() {
   const [form, setForm] = useState(initialForm);
@@ -22,6 +44,19 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [idTaken, setIdTaken] = useState(false);
+
+  // Live duplicate check on the student id (debounced)
+  useEffect(() => {
+    const sid = form.student_id.trim();
+    setIdTaken(false);
+    if (sid.length < 4) return;
+    const t = setTimeout(async () => {
+      const { data } = await supabase.rpc('is_student_registered', { sid });
+      if (data === true) setIdTaken(true);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [form.student_id]);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -37,13 +72,28 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
 
+    const nameParts = form.full_name.trim().split(/\s+/);
+    if (nameParts.length < 2) {
+      setError('กรุณากรอกทั้งชื่อและนามสกุล (คั่นด้วยเว้นวรรค) เช่น สมชาย ใจดี');
+      return;
+    }
+    const [firstName, ...rest] = nameParts;
+    const lastName = rest.join(' ');
+
+    if (idTaken) {
+      setError('รหัสนักศึกษานี้ลงทะเบียนไปแล้ว');
+      return;
+    }
     if (!form.gender) {
       setError('กรุณาเลือกเพศ');
       return;
     }
-    const yearNum = Number(form.year_level);
-    if (!yearNum || yearNum < 1 || yearNum > 8) {
-      setError('กรุณากรอกชั้นปีให้ถูกต้อง');
+    if (!form.year_level) {
+      setError('กรุณาเลือกชั้นปี');
+      return;
+    }
+    if (!/^0\d{8,9}$/.test(form.phone.trim())) {
+      setError('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง เช่น 0812345678');
       return;
     }
 
@@ -52,20 +102,20 @@ export default function RegisterPage() {
       let photoUrl: string | null = null;
 
       if (photo) {
-        const ext = photo.name.split('.').pop() || 'jpg';
-        const path = `${form.student_id}-${Date.now()}.${ext}`;
+        const resized = await resizeImage(photo);
+        const path = `${form.student_id}-${Date.now()}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from('participant-photos')
-          .upload(path, photo, { upsert: false });
+          .upload(path, resized, { upsert: false, contentType: 'image/jpeg' });
         if (uploadError) throw uploadError;
         photoUrl = supabase.storage.from('participant-photos').getPublicUrl(path).data.publicUrl;
       }
 
       const { error: insertError } = await supabase.from('participants').insert({
         student_id: form.student_id.trim(),
-        first_name: form.first_name.trim(),
-        last_name: form.last_name.trim(),
-        year_level: yearNum,
+        first_name: firstName,
+        last_name: lastName,
+        year_level: Number(form.year_level),
         faculty: form.faculty.trim(),
         department: form.department.trim(),
         phone: form.phone.trim(),
@@ -90,139 +140,168 @@ export default function RegisterPage() {
 
   if (done) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
-        <h1 className="font-display text-4xl text-hot">ลงทะเบียนสำเร็จ!</h1>
-        <p className="text-muted">รอเรียกคิวเพื่อขึ้นวิ่งบนลู่วิ่งได้เลยครับ</p>
-        <Link href="/" className="mt-4 rounded-full bg-hot px-6 py-3 font-semibold text-ink">
-          ดูตารางอันดับ
-        </Link>
-      </main>
+      <>
+        <div className="stadium-bg" />
+        <div className="track-lines" />
+        <main className="reg-success">
+          <span style={{ fontSize: '3rem' }}>🎉</span>
+          <h1>ลงทะเบียนสำเร็จ!</h1>
+          <p>รอเรียกคิวเพื่อขึ้นวิ่งบนลู่วิ่งได้เลยครับ</p>
+          <Link href="/">ดูตารางอันดับ</Link>
+        </main>
+      </>
     );
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-lg bg-ink px-6 py-10">
-      <h1 className="mb-1 font-display text-3xl text-cream">ลงทะเบียนเข้าร่วม</h1>
-      <p className="mb-8 text-muted">กรอกข้อมูลให้ครบก่อนขึ้นวิ่งบนลู่วิ่ง Curved Treadmill</p>
+    <>
+      <div className="stadium-bg" />
+      <div className="track-lines" />
+      <div className="reg-scroll">
+        <header className="site-header">
+          <div className="header-inner header-flex" style={{ paddingBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <Image
+                src="/logo_Group.jpg"
+                alt="โลโก้ชมรม"
+                width={64}
+                height={64}
+                className="logo-img"
+                priority
+              />
+              <div>
+                <h1 className="site-title text-glow-orange">ลงทะเบียนเข้าร่วม</h1>
+                <p className="site-subtitle">⚡ Speed Challenge · 30-Second Sprint</p>
+              </div>
+            </div>
+            <Link href="/" className="tab-btn active" style={{ textDecoration: 'none' }}>
+              🏆 ดูตารางอันดับ
+            </Link>
+          </div>
+        </header>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <Field label="รหัสนักศึกษา">
-          <input
-            required
-            value={form.student_id}
-            onChange={(e) => update('student_id', e.target.value)}
-            className="w-full rounded-lg px-4 py-3"
-          />
-        </Field>
+        <main className="reg-wrap">
+          <form onSubmit={onSubmit} className="reg-card">
+            <div className="reg-grid">
+              <label>
+                <span className="reg-label">ชื่อ–นามสกุล<span className="req">*</span></span>
+                <input
+                  required
+                  className="reg-input"
+                  placeholder="เช่น สมชาย ใจดี"
+                  value={form.full_name}
+                  onChange={(e) => update('full_name', e.target.value)}
+                />
+              </label>
 
-        <div className="flex gap-3">
-          <Field label="ชื่อจริง" className="flex-1">
-            <input
-              required
-              value={form.first_name}
-              onChange={(e) => update('first_name', e.target.value)}
-              className="w-full rounded-lg px-4 py-3"
-            />
-          </Field>
-          <Field label="นามสกุล" className="flex-1">
-            <input
-              required
-              value={form.last_name}
-              onChange={(e) => update('last_name', e.target.value)}
-              className="w-full rounded-lg px-4 py-3"
-            />
-          </Field>
-        </div>
+              <label>
+                <span className="reg-label">รหัสนักศึกษา<span className="req">*</span></span>
+                <input
+                  required
+                  className="reg-input"
+                  placeholder="เช่น B68XXXXX"
+                  value={form.student_id}
+                  onChange={(e) => update('student_id', e.target.value)}
+                  style={idTaken ? { borderColor: '#FF4D4D' } : undefined}
+                />
+                {idTaken && (
+                  <span className="reg-hint" style={{ color: '#FF6B6B' }}>
+                    ⚠️ รหัสนักศึกษานี้ลงทะเบียนไปแล้ว
+                  </span>
+                )}
+              </label>
 
-        <div className="flex gap-3">
-          <Field label="ชั้นปี" className="w-28">
-            <input
-              required
-              type="number"
-              min={1}
-              max={8}
-              value={form.year_level}
-              onChange={(e) => update('year_level', e.target.value)}
-              className="w-full rounded-lg px-4 py-3"
-            />
-          </Field>
-          <Field label="เพศ" className="flex-1">
-            <select
-              required
-              value={form.gender}
-              onChange={(e) => update('gender', e.target.value as 'male' | 'female')}
-              className="w-full rounded-lg px-4 py-3"
-            >
-              <option value="">เลือก</option>
-              <option value="male">ชาย</option>
-              <option value="female">หญิง</option>
-            </select>
-          </Field>
-        </div>
+              <label>
+                <span className="reg-label">สาขาวิชา<span className="req">*</span></span>
+                <input
+                  required
+                  className="reg-input"
+                  placeholder="เช่น วิศวกรรมขนส่งและโลจิสติกส์"
+                  value={form.department}
+                  onChange={(e) => update('department', e.target.value)}
+                />
+              </label>
 
-        <Field label="คณะ">
-          <input
-            required
-            value={form.faculty}
-            onChange={(e) => update('faculty', e.target.value)}
-            className="w-full rounded-lg px-4 py-3"
-          />
-        </Field>
+              <label>
+                <span className="reg-label">ชั้นปี<span className="req">*</span></span>
+                <select
+                  required
+                  className="reg-select"
+                  value={form.year_level}
+                  onChange={(e) => update('year_level', e.target.value)}
+                >
+                  <option value="">— เลือกชั้นปี —</option>
+                  {yearOptions.map((y) => (
+                    <option key={y.value} value={y.value}>{y.label}</option>
+                  ))}
+                </select>
+              </label>
 
-        <Field label="สาขา">
-          <input
-            required
-            value={form.department}
-            onChange={(e) => update('department', e.target.value)}
-            className="w-full rounded-lg px-4 py-3"
-          />
-        </Field>
+              <label>
+                <span className="reg-label">คณะ<span className="req">*</span></span>
+                <input
+                  required
+                  className="reg-input"
+                  placeholder="เช่น วิศวกรรมศาสตร์"
+                  value={form.faculty}
+                  onChange={(e) => update('faculty', e.target.value)}
+                />
+              </label>
 
-        <Field label="เบอร์โทรศัพท์">
-          <input
-            required
-            type="tel"
-            value={form.phone}
-            onChange={(e) => update('phone', e.target.value)}
-            className="w-full rounded-lg px-4 py-3"
-          />
-        </Field>
+              <label>
+                <span className="reg-label">เพศ<span className="req">*</span></span>
+                <select
+                  required
+                  className="reg-select"
+                  value={form.gender}
+                  onChange={(e) => update('gender', e.target.value as 'male' | 'female')}
+                >
+                  <option value="">— เลือกเพศ —</option>
+                  <option value="male">ชาย</option>
+                  <option value="female">หญิง</option>
+                </select>
+              </label>
 
-        <Field label="รูปภาพส่วนตัว (ใช้แสดงบนตารางอันดับ)">
-          <input type="file" accept="image/*" onChange={onPhotoChange} className="w-full rounded-lg px-4 py-3" />
-          {preview && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview} alt="ตัวอย่างรูป" className="mt-3 h-28 w-28 rounded-full object-cover" />
-          )}
-        </Field>
+              <label>
+                <span className="reg-label">เบอร์โทรศัพท์<span className="req">*</span></span>
+                <input
+                  required
+                  type="tel"
+                  inputMode="numeric"
+                  className="reg-input"
+                  placeholder="เช่น 0812345678"
+                  value={form.phone}
+                  onChange={(e) => update('phone', e.target.value)}
+                />
+                <span className="reg-hint">ใช้ติดต่อเรียกคิวเท่านั้น ไม่แสดงบนตารางอันดับ</span>
+              </label>
 
-        {error && <p className="rounded-lg bg-hot/10 px-4 py-3 text-hot">{error}</p>}
+              <label>
+                <span className="reg-label">รูปโปรไฟล์ <span className="reg-hint" style={{ display: 'inline' }}>(แสดงบนตารางอันดับ)</span></span>
+                <div className="reg-photo-row">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={onPhotoChange}
+                    className="reg-input"
+                    style={{ padding: '10px 12px' }}
+                  />
+                  {preview && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={preview} alt="ตัวอย่างรูป" className="reg-photo-preview" />
+                  )}
+                </div>
+              </label>
+            </div>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-2 rounded-full bg-hot px-6 py-4 font-display text-lg tracking-wide text-ink transition hover:brightness-110 disabled:opacity-50"
-        >
-          {submitting ? 'กำลังบันทึก...' : 'ลงทะเบียน'}
-        </button>
-      </form>
-    </main>
-  );
-}
+            {error && <p className="reg-error">⚠️ {error}</p>}
 
-function Field({
-  label,
-  children,
-  className = '',
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="mb-1 block text-sm text-muted">{label}</span>
-      {children}
-    </label>
+            <button type="submit" disabled={submitting} className="reg-submit">
+              {submitting ? '⏳ กำลังบันทึก...' : '🏃 ลงทะเบียนเข้าร่วม'}
+            </button>
+          </form>
+        </main>
+      </div>
+    </>
   );
 }

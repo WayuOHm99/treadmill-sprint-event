@@ -2,7 +2,132 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
+import QRCode from 'qrcode';
 import { supabase, LeaderboardRow } from '@/lib/supabaseClient';
+import { staffSearch } from '@/lib/edgeFunctions';
+import { getStaffKey, saveStaffKey, clearStaffKey } from '@/lib/staffKey';
+
+/* ============================================================
+   REGISTER QR — corner badge on the big screen
+============================================================ */
+function RegisterQR() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (open && canvasRef.current) {
+      QRCode.toCanvas(canvasRef.current, `${window.location.origin}/register/`, {
+        width: 130, margin: 1,
+        color: { dark: '#0B0F1A', light: '#FFFFFF' },
+      });
+    }
+  }, [open]);
+  return (
+    <div style={{ position: 'fixed', right: 14, bottom: 14, zIndex: 20, textAlign: 'right' }}>
+      {open && (
+        <div style={{
+          background: '#fff', borderRadius: 12, padding: '8px 8px 4px',
+          border: '2px solid var(--neon-orange)', textAlign: 'center',
+          boxShadow: '0 0 20px rgba(255,107,0,0.4)', marginBottom: 8,
+        }}>
+          <canvas ref={canvasRef} />
+          <div style={{ color: '#0B0F1A', fontWeight: 700, fontSize: '0.72rem', paddingBottom: 2 }}>
+            สแกนเพื่อร่วมวิ่ง
+          </div>
+        </div>
+      )}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          background: 'linear-gradient(90deg, #FF6B00, #FFA500)', color: '#0B1120',
+          border: 'none', borderRadius: 99, padding: '8px 16px',
+          fontFamily: 'Kanit, sans-serif', fontWeight: 700, fontSize: '0.85rem',
+          cursor: 'pointer', boxShadow: '0 2px 14px rgba(255,107,0,0.45)',
+        }}
+      >
+        {open ? '✕ ซ่อน QR' : '📱 QR ลงทะเบียน'}
+      </button>
+    </div>
+  );
+}
+
+/* ============================================================
+   LATEST RESULT BANNER — pops for ~10s when a result is saved
+============================================================ */
+function LatestBanner({ row }: { row: LeaderboardRow }) {
+  return (
+    <div style={{
+      position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 30,
+      display: 'flex', alignItems: 'center', gap: 14,
+      background: 'linear-gradient(90deg, rgba(255,107,0,0.95), rgba(255,165,0,0.95))',
+      color: '#0B1120', borderRadius: 99, padding: '10px 24px',
+      boxShadow: '0 4px 30px rgba(255,107,0,0.6)',
+      animation: 'fadeInUp 0.35s ease', whiteSpace: 'nowrap',
+    }}>
+      <span style={{ fontSize: '1.5rem' }}>🎉</span>
+      <span style={{ fontWeight: 700 }}>
+        {row.first_name} {row.last_name} วิ่งได้ {row.distance_m.toFixed(1)} เมตร!
+      </span>
+    </div>
+  );
+}
+
+/* ============================================================
+   HIDDEN STAFF MENU — subtle gear, PIN once per device
+============================================================ */
+function StaffGear() {
+  const [unlocked, setUnlocked] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => { setUnlocked(!!getStaffKey(null)); }, []);
+
+  async function onGearClick() {
+    if (unlocked) { setOpen((o) => !o); return; }
+    const pin = window.prompt('รหัสสตาฟ:');
+    if (!pin) return;
+    try {
+      await staffSearch(pin.trim(), 'ping'); // validates against the server
+      saveStaffKey(pin.trim());
+      setUnlocked(true);
+      setOpen(true);
+    } catch {
+      window.alert('รหัสไม่ถูกต้อง');
+    }
+  }
+
+  const linkStyle: React.CSSProperties = {
+    display: 'block', padding: '8px 14px', color: '#E5E7EB',
+    textDecoration: 'none', fontSize: '0.85rem', whiteSpace: 'nowrap',
+  };
+
+  return (
+    <span style={{ position: 'fixed', left: 10, bottom: 10, zIndex: 20 }}>
+      <button
+        onClick={onGearClick}
+        aria-label="staff"
+        style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.25, fontSize: '0.85rem', padding: 4 }}
+      >
+        ⚙
+      </button>
+      {open && unlocked && (
+        <span style={{
+          position: 'absolute', bottom: '130%', left: 0, zIndex: 40,
+          background: 'var(--bg-card2)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: 6, boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+        }}>
+          <Link href="/staff/results/" style={linkStyle}>⏱️ บันทึกผลการวิ่ง</Link>
+          <Link href="/staff/export/" style={linkStyle}>📥 Export ข้อมูล</Link>
+          <button
+            onClick={() => { clearStaffKey(); setUnlocked(false); setOpen(false); }}
+            style={{ ...linkStyle, background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', width: '100%', textAlign: 'left' }}
+          >
+            ออกจากโหมดสตาฟ
+          </button>
+        </span>
+      )}
+    </span>
+  );
+}
 
 /* ============================================================
    HELPER: Animate a number counting up
@@ -194,7 +319,7 @@ function RankCard({ row, rank, maxDist }: { row: LeaderboardRow; rank: number; m
       <div className="rank-card r3">
         <div className="rc-left">
           <div className="rc-avatar-wrap">
-            <ProfileAvatar photoUrl={row.photo_url} name={fullName} size="md" />
+            <ProfileAvatar photoUrl={row.photo_url} name={fullName} size="sm" />
             <span className="medal-overlay">{medals[2]}</span>
           </div>
           <div className="rc-info">
@@ -246,7 +371,7 @@ function RankCard({ row, rank, maxDist }: { row: LeaderboardRow; rank: number; m
 /* ============================================================
    RANKING LIST (with gender filter tabs)
 ============================================================ */
-function RankingSection({ title, rows, isScrollable }: { title: string; rows: LeaderboardRow[]; isScrollable?: boolean }) {
+function RankingSection({ title, rows }: { title: string; rows: LeaderboardRow[] }) {
   const maxDist = useMemo(
     () => (rows.length > 0 ? Math.max(...rows.map((r) => r.distance_m)) : 0),
     [rows]
@@ -270,7 +395,7 @@ function RankingSection({ title, rows, isScrollable }: { title: string; rows: Le
         {title}
         <span className="badge">{rows.length} คน</span>
       </h3>
-      <div className={isScrollable ? 'ranking-scroll-area' : 'ranking-list'}>
+      <div className="ranking-list">
         {rows.map((row, i) => (
           <RankCard key={row.id} row={row} rank={i + 1} maxDist={maxDist} />
         ))}
@@ -299,6 +424,8 @@ export default function LeaderboardPage() {
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'male' | 'female'>('leaderboard');
+  const [latest, setLatest] = useState<LeaderboardRow | null>(null);
+  const latestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -314,8 +441,14 @@ export default function LeaderboardPage() {
 
     const channel = supabase
       .channel('leaderboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard_public' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard_public' }, (payload) => {
         load();
+        const n = payload.new as LeaderboardRow | undefined;
+        if (n && n.distance_m > 0) {
+          setLatest(n);
+          if (latestTimer.current) clearTimeout(latestTimer.current);
+          latestTimer.current = setTimeout(() => setLatest(null), 10000);
+        }
       })
       .subscribe();
 
@@ -358,6 +491,9 @@ export default function LeaderboardPage() {
       {/* Stadium background effects */}
       <div className="stadium-bg" />
       <div className="track-lines" />
+      <RegisterQR />
+      <StaffGear />
+      {latest && <LatestBanner row={latest} />}
 
       {/* Header */}
       <header className="site-header">
@@ -423,39 +559,28 @@ export default function LeaderboardPage() {
         ) : (
           <div className="tab-panel active">
             {activeTab === 'leaderboard' && (
-              <div className="lb-container">
-                {/* Left side: Top 5 Male & Female */}
-                <div className="lb-top5">
+              <div className="lb-scroll-wrapper">
+                {/* Side-by-side Top 5 Male & Female */}
+                <div className="lb-grid-2">
                   <RankingSection title="🏆 ชาย TOP 5" rows={men.slice(0, 5)} />
-                  <div style={{ height: 24, flexShrink: 0 }} />
                   <RankingSection title="🏆 หญิง TOP 5" rows={women.slice(0, 5)} />
                 </div>
-                {/* Right side: All Ranks Scrollable */}
-                <div className="lb-all">
-                  <RankingSection title="🏅 อันดับรวมทั้งหมด" rows={activeRows} isScrollable={true} />
+                {/* Overall below */}
+                <div className="lb-overall-section">
+                  <RankingSection title="🏅 อันดับรวมทั้งหมด" rows={activeRows} />
                 </div>
               </div>
             )}
 
             {activeTab === 'male' && (
-              <div className="lb-container">
-                <div className="lb-top5">
-                  <RankingSection title="🏆 ชาย TOP 5" rows={men.slice(0, 5)} />
-                </div>
-                <div className="lb-all">
-                  <RankingSection title="👨 อันดับชายทั้งหมด" rows={activeRows} isScrollable={true} />
-                </div>
+              <div className="lb-scroll-wrapper">
+                <RankingSection title="👨 อันดับชายทั้งหมด" rows={activeRows} />
               </div>
             )}
 
             {activeTab === 'female' && (
-              <div className="lb-container">
-                <div className="lb-top5">
-                  <RankingSection title="🏆 หญิง TOP 5" rows={women.slice(0, 5)} />
-                </div>
-                <div className="lb-all">
-                  <RankingSection title="👩 อันดับหญิงทั้งหมด" rows={activeRows} isScrollable={true} />
-                </div>
+              <div className="lb-scroll-wrapper">
+                <RankingSection title="👩 อันดับหญิงทั้งหมด" rows={activeRows} />
               </div>
             )}
           </div>

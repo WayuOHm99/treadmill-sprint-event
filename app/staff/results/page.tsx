@@ -4,12 +4,13 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { staffSearch, staffSubmitResult, StaffSearchResult } from '@/lib/edgeFunctions';
 import { TreadmillBluetoothSession } from '@/lib/treadmillBluetooth';
+import { getStaffKey } from '@/lib/staffKey';
 
 const RUN_SECONDS = 30;
 
 function ResultsInner() {
   const params = useSearchParams();
-  const secret = params.get('key') ?? '';
+  const secret = getStaffKey(params.get('key'));
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<StaffSearchResult[]>([]);
@@ -112,75 +113,86 @@ function ResultsInner() {
 
   if (!secret) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-ink px-6 text-center text-muted">
-        ลิงก์นี้ไม่มีรหัสผ่าน (key) กรุณาใช้ลิงก์ที่ได้รับจากผู้ดูแลระบบ
+      <main className="reg-success">
+        <p>ลิงก์นี้ไม่มีรหัสผ่าน (key) กรุณาใช้ลิงก์ที่ได้รับจากผู้ดูแลระบบ</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl bg-ink px-6 py-10">
-      <h1 className="mb-6 font-display text-3xl text-cream">บันทึกผลการวิ่ง</h1>
+    <div className="reg-scroll">
+      <div className="stadium-bg" />
+      <div className="track-lines" />
+      <main className="reg-wrap" style={{ maxWidth: 720 }}>
+        <nav style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <a href="/" className="tab-btn" style={{ textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 8 }}>🏆 หน้าลีดเดอร์บอร์ด</a>
+          <a href="/staff/export/" className="tab-btn" style={{ textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 8 }}>📥 Export Excel</a>
+        </nav>
+        <h1 className="site-title text-glow-orange" style={{ marginBottom: 20 }}>⏱️ บันทึกผลการวิ่ง</h1>
 
-      <input
-        placeholder="ค้นหาด้วยรหัสนักศึกษา หรือ ชื่อ-นามสกุล"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="w-full rounded-lg px-4 py-3"
-      />
-      {searchError && <p className="mt-2 text-hot">{searchError}</p>}
+        <input
+          placeholder="ค้นหาด้วยรหัสนักศึกษา หรือ ชื่อ-นามสกุล"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="reg-input"
+        />
+        {searchError && <p className="reg-error">⚠️ {searchError}</p>}
 
       <div className="mt-3 flex flex-col gap-2">
         {results.map((r) => (
           <button
             key={r.id}
             onClick={() => selectParticipant(r)}
-            className={`rounded-lg border px-4 py-3 text-left transition ${
-              selected?.id === r.id ? 'border-hot bg-panel2' : 'border-line bg-panel hover:border-muted'
-            }`}
+            className="rank-card"
+            style={{
+              padding: '12px 16px', textAlign: 'left', cursor: 'pointer', width: '100%',
+              borderColor: selected?.id === r.id ? 'var(--neon-orange)' : undefined,
+            }}
           >
-            <span className="font-semibold text-cream">
+            <span style={{ fontWeight: 700, color: '#fff' }}>
               {r.first_name} {r.last_name}
             </span>
-            <span className="ml-2 text-sm text-muted">{r.student_id}</span>
+            <span className="rc-tag" style={{ marginLeft: 8 }}>{r.student_id}</span>
             {r.distance_m != null && (
-              <span className="ml-2 text-sm text-hot">ผลเดิม {r.distance_m} ม.</span>
+              <span className="rc-tag" style={{ marginLeft: 8, color: 'var(--neon-orange)' }}>
+                ผลเดิม {r.distance_m} ม.
+              </span>
             )}
           </button>
         ))}
       </div>
 
       {selected && (
-        <div className="mt-8 rounded-xl border border-line bg-panel p-6">
-          <h2 className="mb-4 font-display text-2xl text-cream">
-            {selected.first_name} {selected.last_name}
+        <div className="reg-card" style={{ marginTop: 28 }}>
+          <h2 className="section-title" style={{ marginBottom: 16 }}>
+            🏃 {selected.first_name} {selected.last_name}
           </h2>
 
-          <div className="mb-6 rounded-lg border border-line bg-panel2 p-4">
-            <p className="mb-2 text-sm text-muted">โหมดอัตโนมัติ (Bluetooth) — ไม่บังคับ</p>
+          <div className="reg-card" style={{ background: 'var(--bg-card2)', marginBottom: 20, padding: 18 }}>
+            <p className="reg-hint" style={{ marginBottom: 10 }}>โหมดอัตโนมัติ (Bluetooth) — ไม่บังคับ</p>
             {!btSupported && (
-              <p className="text-sm text-muted">เบราว์เซอร์นี้ไม่รองรับ Web Bluetooth (ใช้ Chrome บนคอมพิวเตอร์/Android)</p>
+              <p className="reg-hint">เบราว์เซอร์นี้ไม่รองรับ Web Bluetooth (ใช้ Chrome บนคอมพิวเตอร์/Android)</p>
             )}
             {btSupported && !btConnected && (
-              <button onClick={connectBluetooth} className="rounded-full bg-panel2 border border-line px-4 py-2 text-cream">
-                เชื่อมต่อลู่วิ่ง
+              <button onClick={connectBluetooth} className="tab-btn active" style={{ cursor: 'pointer' }}>
+                📡 เชื่อมต่อลู่วิ่ง
               </button>
             )}
             {btConnected && !timerRunning && (
-              <button onClick={startTimedRun} className="rounded-full bg-hot px-4 py-2 font-semibold text-ink">
-                เริ่มจับเวลา {RUN_SECONDS} วินาที
+              <button onClick={startTimedRun} className="reg-submit" style={{ marginTop: 0, width: 'auto', padding: '10px 24px', fontSize: '1rem' }}>
+                ▶️ เริ่มจับเวลา {RUN_SECONDS} วินาที
               </button>
             )}
             {timerRunning && (
-              <p className="font-display text-4xl text-hot tabular">{secondsLeft} วิ</p>
+              <p className="rc-dist" style={{ fontSize: '2.6rem', color: 'var(--neon-orange)' }}>{secondsLeft} วิ</p>
             )}
             {btLiveDistance !== null && (
-              <p className="mt-2 text-sm text-muted">ระยะสะสมปัจจุบันจากลู่วิ่ง: {btLiveDistance} ม.</p>
+              <p className="reg-hint" style={{ marginTop: 8 }}>ระยะสะสมปัจจุบันจากลู่วิ่ง: {btLiveDistance} ม.</p>
             )}
           </div>
 
-          <label className="mb-4 block">
-            <span className="mb-1 block text-sm text-muted">ระยะทางที่วิ่งได้ (เมตร) — แก้ไขได้เสมอ</span>
+          <label style={{ display: 'block', marginBottom: 14 }}>
+            <span className="reg-label">ระยะทางที่วิ่งได้ (เมตร) — แก้ไขได้เสมอ</span>
             <input
               type="number"
               step="0.1"
@@ -189,32 +201,34 @@ function ResultsInner() {
                 setDistanceInput(e.target.value);
                 setSource('manual');
               }}
-              className="w-full rounded-lg px-4 py-3 text-xl"
+              className="reg-input"
+              style={{ fontSize: '1.3rem' }}
             />
           </label>
 
-          <p className="mb-4 text-sm text-muted">
+          <p className="reg-hint" style={{ marginBottom: 14 }}>
             แหล่งที่มา: {source === 'device' ? 'อ่านจากลู่วิ่งอัตโนมัติ' : 'กรอกด้วยมือ'}
           </p>
 
-          <button
-            onClick={submit}
-            disabled={submitting}
-            className="w-full rounded-full bg-hot py-4 font-display text-lg text-ink disabled:opacity-50"
-          >
-            {submitting ? 'กำลังบันทึก...' : 'บันทึกผล'}
+          <button onClick={submit} disabled={submitting} className="reg-submit">
+            {submitting ? '⏳ กำลังบันทึก...' : '💾 บันทึกผล'}
           </button>
 
-          {submitMsg && <p className="mt-3 text-center text-cream">{submitMsg}</p>}
+          {submitMsg && (
+            <p style={{ marginTop: 12, textAlign: 'center', color: submitMsg.includes('สำเร็จ') ? 'var(--neon-green)' : '#FF6B6B' }}>
+              {submitMsg}
+            </p>
+          )}
         </div>
       )}
-    </main>
+      </main>
+    </div>
   );
 }
 
 export default function StaffResultsPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-ink" />}>
+    <Suspense fallback={<main style={{ minHeight: '100vh' }} />}>
       <ResultsInner />
     </Suspense>
   );

@@ -4,13 +4,14 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { staffExport } from '@/lib/edgeFunctions';
+import { getStaffKey } from '@/lib/staffKey';
 
 const GENDER_TH: Record<string, string> = { male: 'ชาย', female: 'หญิง' };
 const SOURCE_TH: Record<string, string> = { manual: 'กรอกมือ', device: 'ลู่วิ่งอัตโนมัติ' };
 
 function ExportInner() {
   const params = useSearchParams();
-  const secret = params.get('key') ?? '';
+  const secret = getStaffKey(params.get('key'));
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +61,10 @@ function ExportInner() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
+      <nav style={{ display: 'flex', gap: 8 }}>
+        <a href="/" className="tab-btn" style={{ textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 8 }}>🏆 หน้าลีดเดอร์บอร์ด</a>
+        <a href="/staff/results/" className="tab-btn" style={{ textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 8 }}>⏱️ บันทึกผล</a>
+      </nav>
       <h1 className="font-display text-3xl text-cream">Export ข้อมูลเป็น Excel</h1>
       <p className="text-muted">ดึงข้อมูลผู้ลงทะเบียนและผลการวิ่งทั้งหมดเป็นไฟล์ .xlsx</p>
       <button
