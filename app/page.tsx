@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
 import { supabase, LeaderboardRow } from '@/lib/supabaseClient';
 
@@ -47,53 +46,64 @@ function useCountUp(target: number, decimals = 0, duration = 900) {
 }
 
 /* ============================================================
-   STAT CARD COMPONENT
+   HEADER STAT BADGE — compact stat display in header
 ============================================================ */
-function StatCard({
-  label,
-  icon,
-  value,
-  unit,
-  decimals = 0,
-  colorVar,
-  glowClass,
-  variant,
-}: {
-  label: string;
+function HeaderStat({ icon, label, value, decimals = 0, colorVar }: {
   icon: string;
+  label: string;
   value: number;
-  unit: string;
   decimals?: number;
   colorVar: string;
-  glowClass?: string;
-  variant: string;
 }) {
   const display = useCountUp(value, decimals);
-
   return (
-    <div className={`stat-card ${variant}`}>
-      <p className="stat-label">
-        {icon} {label}
-      </p>
-      <div
-        className={`stat-value ${glowClass || ''}`}
-        style={{ color: `var(${colorVar})` }}
-      >
-        {display}
+    <div className="header-stat">
+      <span className="header-stat-icon">{icon}</span>
+      <div>
+        <div className="header-stat-value" style={{ color: `var(${colorVar})` }}>{display}</div>
+        <div className="header-stat-label">{label}</div>
       </div>
-      <p className="stat-unit">{unit}</p>
     </div>
   );
 }
 
 /* ============================================================
-   RANK CARD — renders ranking items with medals/particles
+   PROFILE AVATAR — shows photo or fallback
+============================================================ */
+function ProfileAvatar({ photoUrl, name, size }: {
+  photoUrl: string | null;
+  name: string;
+  size: 'lg' | 'md' | 'sm';
+}) {
+  const sizeClass = size === 'lg' ? 'avatar-lg' : size === 'md' ? 'avatar-md' : 'avatar-sm';
+
+  if (photoUrl) {
+    return (
+      <div className={`rc-avatar ${sizeClass}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photoUrl} alt={name} className="rc-avatar-img" />
+      </div>
+    );
+  }
+
+  // Fallback: first letter
+  const initial = name ? name.charAt(0).toUpperCase() : '?';
+  return (
+    <div className={`rc-avatar rc-avatar-fallback ${sizeClass}`}>
+      {initial}
+    </div>
+  );
+}
+
+/* ============================================================
+   RANK CARD — renders ranking items with photos + medals
 ============================================================ */
 function RankCard({ row, rank, maxDist }: { row: LeaderboardRow; rank: number; maxDist: number }) {
   const barRef = useRef<HTMLDivElement>(null);
   const dist = row.distance_m;
   const pct = maxDist > 0 ? ((dist / maxDist) * 100).toFixed(1) : '0';
   const firstName = row.first_name;
+  const fullName = `${firstName} ${row.last_name}`;
   const medals = ['🥇', '🥈', '🥉'];
 
   const genderBadge =
@@ -125,11 +135,12 @@ function RankCard({ row, rank, maxDist }: { row: LeaderboardRow; rank: number; m
         </div>
         <span className="crown-anim">👑</span>
         <div className="rc-left">
-          <div className="rc-medal">
-            <span className="medal-emoji">{medals[0]}</span>
+          <div className="rc-avatar-wrap">
+            <ProfileAvatar photoUrl={row.photo_url} name={fullName} size="lg" />
+            <span className="medal-overlay">{medals[0]}</span>
           </div>
           <div className="rc-info">
-            <div className="rc-name">{firstName} {row.last_name}</div>
+            <div className="rc-name">{fullName}</div>
             <div className="rc-meta">
               <span className="rc-tag">🏆 อันดับ 1</span>
               <span className="rc-tag">{row.faculty}</span>
@@ -153,11 +164,12 @@ function RankCard({ row, rank, maxDist }: { row: LeaderboardRow; rank: number; m
     return (
       <div className="rank-card r2">
         <div className="rc-left">
-          <div className="rc-medal">
-            <span className="medal-emoji">{medals[1]}</span>
+          <div className="rc-avatar-wrap">
+            <ProfileAvatar photoUrl={row.photo_url} name={fullName} size="md" />
+            <span className="medal-overlay">{medals[1]}</span>
           </div>
           <div className="rc-info">
-            <div className="rc-name">{firstName} {row.last_name}</div>
+            <div className="rc-name">{fullName}</div>
             <div className="rc-meta">
               <span className="rc-tag">🥈 อันดับ 2</span>
               <span className="rc-tag">{row.faculty}</span>
@@ -181,11 +193,12 @@ function RankCard({ row, rank, maxDist }: { row: LeaderboardRow; rank: number; m
     return (
       <div className="rank-card r3">
         <div className="rc-left">
-          <div className="rc-medal">
-            <span className="medal-emoji">{medals[2]}</span>
+          <div className="rc-avatar-wrap">
+            <ProfileAvatar photoUrl={row.photo_url} name={fullName} size="md" />
+            <span className="medal-overlay">{medals[2]}</span>
           </div>
           <div className="rc-info">
-            <div className="rc-name">{firstName} {row.last_name}</div>
+            <div className="rc-name">{fullName}</div>
             <div className="rc-meta">
               <span className="rc-tag">🥉 อันดับ 3</span>
               <span className="rc-tag">{row.faculty}</span>
@@ -209,11 +222,12 @@ function RankCard({ row, rank, maxDist }: { row: LeaderboardRow; rank: number; m
   return (
     <div className={`rank-card r-other ${rank === 4 ? 'r4' : ''}`}>
       <div className="rc-left">
-        <div className="rc-medal">
-          <span className="rc-num">{rank}</span>
+        <div className="rc-avatar-wrap">
+          <ProfileAvatar photoUrl={row.photo_url} name={fullName} size="sm" />
+          <span className="rank-num-overlay">{rank}</span>
         </div>
         <div className="rc-info">
-          <div className="rc-name">{firstName} {row.last_name}</div>
+          <div className="rc-name">{fullName}</div>
           <div className="rc-meta">
             <span className="rc-tag">{row.faculty}</span>
             <span className="rc-tag">{row.department}</span>
@@ -285,8 +299,6 @@ export default function LeaderboardPage() {
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'male' | 'female'>('leaderboard');
-  const [search, setSearch] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -322,44 +334,18 @@ export default function LeaderboardPage() {
     () => (withDistance.length > 0 ? Math.max(...withDistance.map((r) => r.distance_m)) : 0),
     [withDistance]
   );
-  const avgDistance = useMemo(
-    () =>
-      withDistance.length > 0
-        ? withDistance.reduce((sum, r) => sum + r.distance_m, 0) / withDistance.length
-        : 0,
-    [withDistance]
-  );
 
-  // Filter by search
-  const filteredRows = useMemo(() => {
-    let list: LeaderboardRow[];
+  // Active tab rows
+  const activeRows = useMemo(() => {
     switch (activeTab) {
       case 'male':
-        list = men;
-        break;
+        return men;
       case 'female':
-        list = women;
-        break;
+        return women;
       default:
-        list = withDistance;
+        return withDistance;
     }
-
-    if (!search.trim()) return list;
-    const q = search.toLowerCase();
-    return list.filter(
-      (r) =>
-        r.first_name.toLowerCase().includes(q) ||
-        r.last_name.toLowerCase().includes(q) ||
-        r.faculty.toLowerCase().includes(q) ||
-        r.department.toLowerCase().includes(q)
-    );
-  }, [activeTab, men, women, withDistance, search]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
+  }, [activeTab, men, women, withDistance]);
 
   const tabs: { key: typeof activeTab; label: string }[] = [
     { key: 'leaderboard', label: '🏆 ลีดเดอร์บอร์ดรวม' },
@@ -375,7 +361,7 @@ export default function LeaderboardPage() {
 
       {/* Header */}
       <header className="site-header">
-        <div className="header-inner">
+        <div className="header-inner header-flex">
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {/* Club Logo */}
             <Image
@@ -392,7 +378,27 @@ export default function LeaderboardPage() {
             </div>
           </div>
 
-          {/* Navigation tabs */}
+          {/* Stats in header — right side */}
+          <div className="header-stats">
+            <HeaderStat
+              icon="👟"
+              label="ผู้เข้าร่วม"
+              value={totalParticipants}
+              colorVar="--neon-orange"
+            />
+            <div className="header-stat-divider" />
+            <HeaderStat
+              icon="🚀"
+              label="สถิติสูงสุด"
+              value={maxDistance}
+              decimals={1}
+              colorVar="--neon-green"
+            />
+          </div>
+        </div>
+
+        {/* Navigation tabs */}
+        <div className="header-inner" style={{ paddingTop: 0 }}>
           <nav className="nav-tabs" role="tablist">
             {tabs.map((tab) => (
               <button
@@ -411,65 +417,6 @@ export default function LeaderboardPage() {
 
       {/* Main content */}
       <main className="main-wrap">
-        {/* Stat cards */}
-        <div className="stat-grid">
-          <StatCard
-            label="ผู้เข้าร่วมทั้งหมด"
-            icon="👟"
-            value={totalParticipants}
-            unit="คน"
-            colorVar="--neon-orange"
-            glowClass="text-glow-orange"
-            variant="c-total"
-          />
-          <StatCard
-            label="สถิติสูงสุด"
-            icon="🚀"
-            value={maxDistance}
-            unit="เมตร (สูงสุด)"
-            decimals={1}
-            colorVar="--neon-green"
-            glowClass="text-glow-green"
-            variant="c-max"
-          />
-          <StatCard
-            label="ระยะทางเฉลี่ย"
-            icon="📊"
-            value={avgDistance}
-            unit="เมตร (เฉลี่ย)"
-            decimals={2}
-            colorVar="--neon-blue"
-            variant="c-avg"
-          />
-        </div>
-
-        {/* Search & Refresh */}
-        <div className="lb-controls">
-          <input
-            type="search"
-            className="search-input"
-            placeholder="🔍 ค้นหา ชื่อ, คณะ, สาขา..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button
-            className={`btn-refresh ${refreshing ? 'spinning' : ''}`}
-            onClick={handleRefresh}
-          >
-            <span className="refresh-icon" style={{ display: 'inline-block' }}>
-              ↻
-            </span>
-            รีเฟรช
-          </button>
-        </div>
-
-        {/* Register button */}
-        <div style={{ marginBottom: 28 }}>
-          <Link href="/register/" className="btn-register">
-            📝 ลงทะเบียนเข้าร่วม
-          </Link>
-        </div>
-
         {/* Rankings */}
         {loading ? (
           <SkeletonRows count={5} />
@@ -482,16 +429,16 @@ export default function LeaderboardPage() {
                   <RankingSection title="🏆 ชาย TOP 5" rows={men.slice(0, 5)} />
                   <RankingSection title="🏆 หญิง TOP 5" rows={women.slice(0, 5)} />
                 </div>
-                <RankingSection title="🏅 อันดับรวมทั้งหมด" rows={filteredRows} />
+                <RankingSection title="🏅 อันดับรวมทั้งหมด" rows={activeRows} />
               </>
             )}
 
             {activeTab === 'male' && (
-              <RankingSection title="👨 อันดับชาย" rows={filteredRows} />
+              <RankingSection title="👨 อันดับชาย" rows={activeRows} />
             )}
 
             {activeTab === 'female' && (
-              <RankingSection title="👩 อันดับหญิง" rows={filteredRows} />
+              <RankingSection title="👩 อันดับหญิง" rows={activeRows} />
             )}
           </div>
         )}
